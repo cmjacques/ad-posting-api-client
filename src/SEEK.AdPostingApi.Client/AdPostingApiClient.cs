@@ -18,6 +18,7 @@ namespace SEEK.AdPostingApi.Client
 
         public AdPostingApiClient(string id, string secret, Environment env = Environment.Production) : this(id, secret, env.GetAttribute<EnvironmentUrlAttribute>().Uri)
         {
+
         }
 
         public AdPostingApiClient(string id, string secret, Uri adPostingUri) : this(adPostingUri, new OAuth2TokenClient(id, secret))
@@ -28,7 +29,12 @@ namespace SEEK.AdPostingApi.Client
         {
             this._ensureIndexResourceInitialised = new Lazy<Task>(() => this.InitialiseIndexResource(adPostingUri), LazyThreadSafetyMode.ExecutionAndPublication);
             this._tokenClient = tokenClient;
-            this._client = new Hal.Client(new HttpClient(new AdPostingApiMessageHandler(new OAuthMessageHandler(tokenClient))));
+            this._client = new Hal.Client(new HttpClient(AddMessageHandler(new AdPostingApiMessageHandler(new OAuthMessageHandler(tokenClient)))));
+        }
+
+        protected virtual HttpMessageHandler AddMessageHandler(HttpMessageHandler innerMessageHandler)
+        {
+            return innerMessageHandler;
         }
 
         private Task EnsureIndexResourceInitialised()
