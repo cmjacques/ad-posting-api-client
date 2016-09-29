@@ -14,7 +14,7 @@ namespace SEEK.AdPostingApi.Client
         private readonly IOAuth2TokenClient _tokenClient;
         private IndexResource _indexResource;
         private readonly Lazy<Task> _ensureIndexResourceInitialised;
-        private readonly Hal.Client _client;
+        private readonly Lazy<Hal.Client> _client;
 
         public AdPostingApiClient(string id, string secret, Environment env = Environment.Production) : this(id, secret, env.GetAttribute<EnvironmentUrlAttribute>().Uri)
         {
@@ -29,7 +29,9 @@ namespace SEEK.AdPostingApi.Client
         {
             this._ensureIndexResourceInitialised = new Lazy<Task>(() => this.InitialiseIndexResource(adPostingUri), LazyThreadSafetyMode.ExecutionAndPublication);
             this._tokenClient = tokenClient;
-            this._client = new Hal.Client(new HttpClient(AddMessageHandler(new AdPostingApiMessageHandler(new OAuthMessageHandler(tokenClient)))));
+            this._client = new Lazy<Hal.Client>(() => {
+              return new Hal.Client(new HttpClient(AddMessageHandler(new AdPostingApiMessageHandler(new OAuthMessageHandler(tokenClient)))));
+            });
         }
 
         protected virtual HttpMessageHandler AddMessageHandler(HttpMessageHandler innerMessageHandler)
@@ -44,7 +46,7 @@ namespace SEEK.AdPostingApi.Client
 
         internal async Task InitialiseIndexResource(Uri adPostingUri)
         {
-            this._indexResource = await this._client.GetResourceAsync<IndexResource>(adPostingUri);
+            this._indexResource = await this._client.Value.GetResourceAsync<IndexResource>(adPostingUri);
         }
 
         public async Task<AdvertisementResource> CreateAdvertisementAsync(Advertisement advertisement)
@@ -68,7 +70,7 @@ namespace SEEK.AdPostingApi.Client
 
         public async Task<AdvertisementResource> ExpireAdvertisementAsync(Uri uri)
         {
-            return await this._client.PatchResourceAsync<AdvertisementResource, ExpireAdvertisementJsonPatch>(uri, new ExpireAdvertisementJsonPatch());
+            return await this._client.Value.PatchResourceAsync<AdvertisementResource, ExpireAdvertisementJsonPatch>(uri, new ExpireAdvertisementJsonPatch());
         }
 
         public async Task<AdvertisementResource> GetAdvertisementAsync(Guid advertisementId)
@@ -80,7 +82,7 @@ namespace SEEK.AdPostingApi.Client
 
         public async Task<AdvertisementResource> GetAdvertisementAsync(Uri uri)
         {
-            return await this._client.GetResourceAsync<AdvertisementResource>(uri);
+            return await this._client.Value.GetResourceAsync<AdvertisementResource>(uri);
         }
 
         public async Task<ProcessingStatus> GetAdvertisementStatusAsync(Guid advertisementId)
@@ -92,7 +94,7 @@ namespace SEEK.AdPostingApi.Client
 
         public async Task<ProcessingStatus> GetAdvertisementStatusAsync(Uri uri)
         {
-            HttpResponseHeaders httpResponseHeaders = await this._client.HeadResourceAsync<AdvertisementResource>(uri);
+            HttpResponseHeaders httpResponseHeaders = await this._client.Value.HeadResourceAsync<AdvertisementResource>(uri);
 
             return (ProcessingStatus)Enum.Parse(typeof(ProcessingStatus), httpResponseHeaders.GetValues("Processing-Status").Single());
         }
@@ -119,13 +121,13 @@ namespace SEEK.AdPostingApi.Client
             if (advertisement == null)
                 throw new ArgumentNullException(nameof(advertisement));
 
-            return await this._client.PutResourceAsync<AdvertisementResource, Advertisement>(uri, advertisement);
+            return await this._client.Value.PutResourceAsync<AdvertisementResource, Advertisement>(uri, advertisement);
         }
 
         public void Dispose()
         {
             this._tokenClient.Dispose();
-            this._client.Dispose();
+            this._client.Value.Dispose();
         }
     }
 }
